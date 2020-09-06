@@ -2,25 +2,42 @@
 <html>
 <head>
 <title>MedHacks 2020</title>
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"/>
+<ul class="nav nav-tabs">
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="{{ url_for('static', filename='script.js') }}"></script>
   <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <div class="container-fluid">
+<h1>
+    <img src="{{ url_for('static', filename='Logo_no_icon.png') }}"/>
 
-<div class="row">
-    <div class="col-12">
-        <h1>The population you have selected has {{population_size}} people</h1>
+  </h1>
+<div class="panel panel-default">
+    <div class="panel-heading">
+    <h3>There are {{population_size}} patients in the population you selected.</h3>
     </div>
-</div>
-
-<div id="Demographics">
-<h2>Demographics</h2>
-<div class="row">
-    <div class="col-4">
+    <ul class="nav nav-tabs nav-fill" id="graphCategoryTab" role="tablist">
+      <li class="nav-item">
+        <a class="nav-link active" href="#demographics" data-toggle="tab">Demographics</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" href="#conditions" data-toggle="tab">Conditions</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" href="#medications" data-toggle="tab">Medications</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" href="#encounters" data-toggle="tab">Clinical Encounters</a>
+      </li>
+    </ul>
+    <div class="panel-body">
+    <div class="tab-content" id="graphContentTab">
+        <div class="tab-pane fade" id="demographics">
         <div id="age" style="float:left"></div>
         <script>
         var trace = {
@@ -38,8 +55,6 @@
         }
         Plotly.newPlot('age', data, layout);
         </script>
-    </div>
-<div class="col-4">
     <div id="gender" style="float:left"></div>
         <script>
         var data = [{
@@ -57,8 +72,6 @@
         }
         Plotly.newPlot("gender", data, layout);
         </script>
-</div>
-<div class="col-4">
 <div id="ethnicity" style="float:left"></div>
         <script>
         var data = [{
@@ -76,45 +89,44 @@
         }
         Plotly.newPlot("ethnicity", data, layout);
         </script>
-</div>
-</div>
-</div>
-
-<div id="Conditions">
-<h2>Medical Conditions</h2>
-<div class="row">
-    <div class="col-4">
+        </div>
+        <div class="tab-pane fade" id="conditions">
         <div id="conditions_frequency" style="float:left"></div>
         <script>
         var data = [{
-            type : 'pie',
-            name: "All",
-            domain: {column: 0},
-            labels : {{condition_labels|tojson}},
-            values : {{condition_counts}},
-            hoverinfo : "label+percent+name+value",
-            automargin: true
-        },
-            {
-            type : 'pie',
-            name: "Unresolved",
-            domain: {column: 1},
-            labels : {{active_condition_count_labels|tojson}},
-            values : {{active_condition_counts}},
-            hoverinfo : "label+percent+name+value",
+            type : 'bar',
+            x : {{condition_labels|tojson}},
+            y : {{condition_counts}},
             automargin: true
         }]
         var layout = {
-            title: "All Conditions vs Chronic Conditions",
+            title: "Acute and Chronic conditions",
             height: 400,
-            width: 800,
-            showlegend: false,
-            grid: {rows: 1, columns: 2},
+            width: 500,
+            xaxis:{title: "Conditions"},
+            yaxis:{title: "Frequency"},
+            showlegend: false
         }
         Plotly.newPlot("conditions_frequency", data, layout);
         </script>
-    </div>
-    <div class="col-4">
+        <div id="chronic_conditions_frequency" style="float:left"></div>
+        <script>
+        var data = [{
+            type : 'bar',
+            x : {{active_condition_count_labels|tojson}},
+            y : {{active_condition_counts}},
+            automargin: true
+        }]
+        var layout = {
+            title: "Chronic conditions",
+            height: 400,
+            width: 500,
+            xaxis:{title: "Conditions"},
+            yaxis:{title: "Frequency"},
+            showlegend: false
+        }
+        Plotly.newPlot("chronic_conditions_frequency", data, layout);
+        </script>
         <div id="conditions_per_patient" style="float:left"></div>
         <script>
         var data = [{
@@ -131,23 +143,14 @@
         }
         Plotly.newPlot("conditions_per_patient", data, layout)
         </script>
-    </div>
-    <div class="col-4">
-    </div>
-</div>
-</div>
-
-<div id="Medications">
-<h2>Medications</h2>
-<div class="row">
-    <div class="col-4">
+        </div>
+        <div class="tab-pane fade" id="medications">
         <div id="medications_frequency" style="float:left"></div>
         <script>
         var data = [{
-            type : 'pie',
-            labels : {{active_medications_count_labels|tojson}},
-            values : {{active_medications_counts}},
-            hoverinfo : "label+percent+name+value",
+            type : 'bar',
+            x : {{active_medications_count_labels|tojson}},
+            y : {{active_medications_counts}},
             automargin: true
         }]
         var layout = {
@@ -158,8 +161,6 @@
         }
         Plotly.newPlot("medications_frequency", data, layout);
         </script>
-    </div>
-    <div class="col-4">
         <div id="medications_per_patient" style="float:left"></div>
         <script>
         var data = [{
@@ -176,15 +177,8 @@
         }
         Plotly.newPlot("medications_per_patient", data, layout)
         </script>
-    </div>
-    <div class="col-4">
-    </div>
-</div>
-
-<div id="Encounters">
-<h2>Clinical Encounters</h2>
-<div class="row">
-    <div class="col-4">
+        </div>
+        <div class="tab-pane fade" id="encounters">
         <div id="encounterdistribution" style="float:left"></div>
         <script>
         var trace = {
@@ -202,8 +196,6 @@
         }
         Plotly.newPlot('encounterdistribution', data, layout);
         </script>
-    </div>
-    <div class="col-4">
         <div id="emergencydistribution" style="float:left"></div>
         <script>
         var trace = {
@@ -221,8 +213,6 @@
         }
         Plotly.newPlot('emergencydistribution', data, layout);
         </script>
-    </div>
-    <div class="col-4">
         <div id="outpatientdistribution" style="float:left"></div>
         <script>
         var trace = {
@@ -240,10 +230,6 @@
         }
         Plotly.newPlot('outpatientdistribution', data, layout);
         </script>
-    </div>
-</div>
-<div class="row">
-<div class="col-4">
         <div id="ambulatorydistribution" style="float:left"></div>
         <script>
         var trace = {
@@ -261,8 +247,6 @@
         }
         Plotly.newPlot('ambulatorydistribution', data, layout);
         </script>
-    </div>
-    <div class="col-4">
         <div id="encounters_per_patient" style="float:left"></div>
         <script>
         var data = [{
@@ -280,9 +264,9 @@
         Plotly.newPlot("encounters_per_patient", data, layout)
         </script>
     </div>
-    <div class="col-4">
     </div>
-</div>
-</div>
+    </div>
+    </div>
+    </div>
 </body>
 </html>

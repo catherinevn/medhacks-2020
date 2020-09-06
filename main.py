@@ -57,22 +57,52 @@ def root():
 
 @app.route("/filter_patients", methods=["GET", "POST"])
 def filter_patients():
-    genderfilter = list(filter(lambda x : x, [x.strip for x in request.form.get("genderfilter").strip().split(",")]))
+    genderfilter = list(filter(lambda x : x, [x.strip() for x in request.form.get("genderfilter").strip().split(",")]))
+    #session["genderfilter"] = genderfilter
+    positiveconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("positiveconditions").strip().split(",")]))
+    #session["positiveconditions"] = positiveconditions
+    negativeconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("negativeconditions").strip().split(",")]))
+   # session["negativeconditions"] = negativeconditions
+    upperagefilter = request.form.get("upperage").strip()
+    #session["upperage"] = upperagefilter
+    loweragefilter = request.form.get("lowerage").strip()
+    #session["lowerage"] = loweragefilter
+    practicesfilter = list(filter(lambda x : x, [x.strip() for x in request.form.get("practices").strip().split(",")]))
+    
+    client = BigQueryClient()
+    session["activeprofile"] = [row.Id for row in client.query(construct_filter_query(genderfilter, 
+                                                                  positiveconditions,
+                                                                  negativeconditions,
+                                                                  upperagefilter,
+                                                                  loweragefilter,
+                                                                  practicesfilter))]
+    
+    if len(session["activeprofile"]) == 0:
+        return make_response("Sorry no patients found meeting that criteria", 200)
+    else:
+        return redirect("/population_summary")
+
+def construct_filter_query(genderfilter=[],positiveconditions=[],negativeconditions=[],upperagefilter="",loweragefilter="", practicesfilter=[]):
     if len(genderfilter) == 1:
         genderquery = "{}.{} = '{}'".format(PATIENT,PATIENT_GENDER, genderfilter[0])
     else:
         genderquery = ""
-    positiveconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("positiveconditions").strip().split(",")]))
+    
     if len(positiveconditions) > 0:
         positiveconditionsquery = "{}.{} IN (SELECT {} FROM {}.{} WHERE {} IN ({}))".format(PATIENT,PATIENT_ID, CONDITION_PATIENT,DATABASE,CONDITIONS,CONDITIONS_DESCRIPTION, ",".join(["'{}'".format(x) for x in positiveconditions]))
     else:
         positiveconditionsquery = ""
-    negativeconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("negativeconditions").strip().split(",")]))
+    
     if len(negativeconditions) > 0:
         negativeconditionsquery = "{}.{} NOT IN (SELECT {} FROM {}.{} WHERE {} IN ({}))".format(PATIENT,PATIENT_ID, CONDITION_PATIENT,DATABASE,CONDITIONS,CONDITIONS_DESCRIPTION, ",".join(["'{}'".format(x) for x in positiveconditions]))
     else:
         negativeconditionsquery = ""
-    upperagefilter = request.form.get("upperage").strip()
+    
+    if len(practicesfilter) > 0:
+        practicesquery = "Patients.Id IN (SELECT PATIENT FROM Synthea2.Encounters WHERE ORGANIZATION IN (SELECT Organizations.Id FROM Synthea2.Organizations WHERE NAME IN ({})))".format(",".join(["'{}'".format(x) for x in practicesfilter]))
+    else:
+        practicesquery = ""
+    
     if upperagefilter != "":
         upperagequery = "DATE_DIFF(CURRENT_DATE,{}.{},YEAR) <= {}".format(PATIENT,PATIENT_BIRTHDATE,upperagefilter)
     else:
@@ -83,7 +113,6 @@ def filter_patients():
     else:
         loweragequery = ""
     
-    client = BigQueryClient()
     overallquery = "SELECT {}.{} FROM {}.{} WHERE {} IS NULL".format(PATIENT,PATIENT_ID,DATABASE,PATIENT,PATIENT_DEATHDATE)
     if genderquery != "" and overallquery.find("WHERE") > -1:
         overallquery += " AND " + genderquery
@@ -97,6 +126,10 @@ def filter_patients():
         overallquery += " AND " + negativeconditionsquery
     elif negativeconditionsquery != "" and overallquery.find("WHERE") == -1:
         overallquery += " WHERE " + negativeconditionsquery
+    if practicesquery != "" and overallquery.find("WHERE") > -1:
+        overallquery += " AND " + practicesquery
+    elif practicesquery != "" and overallquery.find("WHERE") == -1:
+        overallquery += " WHERE " + practicesquery
     if loweragequery != "" and overallquery.find("WHERE") > -1:
         overallquery += " AND " + loweragequery
     elif loweragequery != "" and overallquery.find("WHERE") == -1:
@@ -106,20 +139,12 @@ def filter_patients():
     elif upperagequery != "" and overallquery.find("WHERE") == -1:
         overallquery += " WHERE " + upperagequery
 
-    temp = [row.Id for row in client.query(overallquery)]
-    if len(temp) == 0:
-        return make_response("Sorry no patients found meeting that criteria", 200)
-    else:
-        f = open("activeprofile.txt","w")
-        f.write(",".join(temp))
-        f.close()
-        return redirect("/population_summary")
+    return overallquery
 
 @app.route("/population_summary")
 def population_summary():
-    f = open("activeprofile.txt","r")
-    data = f.read().split(",")
-    f.close()
+    client = BigQueryClient()
+    data = session["activeprofile"] #[row.Id for row in client.query(construct_filter_query())]
     
     conditions = get_conditions(data);
     condition_counts = conditions["DESCRIPTION"].value_counts().values
@@ -178,10 +203,6 @@ def population_summary():
                            outpatient=outpatient,ambulatory=ambulatory,
                            encounters_per_patient=encounters_per_patient,
                            encounters_per_patient_label=encounters_per_patient_label)
-
-@app.route("/get_current_profiles", methods=["GET"])
-def get_profiles():
-    return make_response(jsonify(list(session.keys())), 200)
 
 def get_conditions(profile):
     client = BigQueryClient()

@@ -12,6 +12,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-tagsinput/0.8.0/bootstrap-tagsinput.css">
   <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
   <link rel="stylesheet" href="/resources/demos/style.css">
+  <style> 
+    body{
+      font-family: Georgia;
+    } </style>
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
   <script>
   $( function() {
@@ -31,7 +35,7 @@
   
   <title>MedHacks 2020</title>
   <script src="{{ url_for('static', filename='script.js') }}"></script>
-  <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
   
   <script>
   $(document).ready(function() {
@@ -65,20 +69,31 @@
 <body>
 <div class="container-fluid">
 <div class="row">
+<center>
   <div class="col-12">
-  <h1>Data Analysis System for Senior Health (DASSHboard)</h1>
+  <h1>
+    <img src="{{ url_for('static', filename='Logo_no_icon.png') }}"/>
+
+  </h1>
   There are currently {{patientno}} patients in the electronic health records
   </div>
 </div>
+</center>
 <form id="filterform" method="POST" action="/filter_patients">
 <div class="row">
 <div class="col-4"></div>
 <div class="col-4">
+    <br /> 
     <center>
-    Age range: <input type="number" min=0 max=200 name="lowerage" id="lowerage" value="0"> to <input type="number" min=0 max=200 name="upperage" id="upperage" vaule="200"><br />
-    <div id="slider-range" style="width:400px"></div>
-    
-      Gender<br />
+    <div class="container">
+     <font size="+2" > Age range: </font> <input type="number" min=0 max=200 name="lowerage" id="lowerage" value="0"> <font size="+2">to</font> <input type="number" min=0 max=200 name="upperage" id="upperage" vaule="200"><br />
+    <br />
+      <div id="slider-range" style="width:400px"></div>
+    </div>
+    <br />
+    <div class="container">  
+      <font size="+2"> Gender </font>
+      <br />
       <input name="genderfilter" type="text" data-role="tagsinput" value="{% for option in gender %} {{option}}, {% endfor %}" id="genderfilter" autocomplete="off">
       <script>
       var gendersuggester = new Bloodhound({
@@ -97,8 +112,10 @@
           }
         });
       </script>
-      
-      <br />Race<br />
+     </div>
+
+     <div class="container"> 
+      <br /><font size="+2">Race</font><br />
       <input name="racefilter" type="text" data-role="tagsinput" value="{% for option in race %} {{option}}, {% endfor %}" id="racefilter">
       <script>
       var racesuggester = new Bloodhound({
@@ -117,9 +134,10 @@
           }
         });
       </script>
+    </div>
     
-    
-    <br />Conditions to include<br />
+    <div class="container">
+    <br /><font size="+2">Conditions to include</font><br />
     <input name="positiveconditions" type="text" data-role="tagsinput" value="" id="condition_positive_filter">
     <script>
       var conditionsuggester = new Bloodhound({
@@ -138,8 +156,10 @@
           }
         });
       </script>
-    
-    <br />Conditions to exclude<br />
+    </div>
+   
+    <div class="container">
+    <br /><font size="+2">Conditions to exclude</font><br />
     <input name="negativeconditions" type="text" data-role="tagsinput" value="" id="condition_negative_filter">
     <script>
       var conditionsuggester = new Bloodhound({
@@ -158,8 +178,10 @@
           }
         });
       </script>
-      
-      <br />Practices<br />
+      </div>
+    
+    <div class="container">
+      <br /><font size="+2">Practices</font><br />
     <input name="practices" type="text" data-role="tagsinput" value="" id="practices">
     <script>
       var practicesuggester = new Bloodhound({
@@ -178,11 +200,15 @@
           }
         });
       </script>
-
+    </div>
+  
+  <br /> 
+  <div class="container">
     <div class="col-12">
-    <input type="submit" id="filter_population" value="Filter">
+    <input type="submit" id="filter_population" value="Filter" class="btn btn-primary">
     </center>
     </div>
+  </div>
 <div class="col-4"></div>
 </div>
 </form>
