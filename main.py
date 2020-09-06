@@ -51,33 +51,33 @@ def root():
     race = [row[PATIENT_RACE] for row in client.query("SELECT DISTINCT {} FROM {}.{}".format(PATIENT_RACE, DATABASE, PATIENT))]
     conditions = [(row[CONDITION_CODE],row[CONDITION_DESCRIPTION]) for row in client.query("SELECT DISTINCT {},{} from {}.{}".format(CONDITION_CODE, CONDITION_DESCRIPTION, DATABASE, CONDITIONS))]
     practices = [(row[ORGANIZATION_ID],row[ORGANIZATION_NAME]) for row in client.query("SELECT DISTINCT {},{} from {}.{}".format(ORGANIZATION_ID, ORGANIZATION_NAME, DATABASE, ORGANIZATIONS))]
-    patientno = [row.count for row in client.query("SELECT COUNT(DISTINCT {}) as count FROM {}.{}".format(PATIENT_ID, DATABASE, PATIENT))][0]
 
-    return render_template('index.html', gender=gender, race=race, conditions=conditions, practices=practices, patientno=patientno)
+    return render_template('index.html', gender=gender, race=race, conditions=conditions, practices=practices)
 
 @app.route("/filter_patients", methods=["GET", "POST"])
 def filter_patients():
     genderfilter = list(filter(lambda x : x, [x.strip() for x in request.form.get("genderfilter").strip().split(",")]))
-    #session["genderfilter"] = genderfilter
+    session["genderfilter"] = genderfilter
     positiveconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("positiveconditions").strip().split(",")]))
-    #session["positiveconditions"] = positiveconditions
+    session["positiveconditions"] = positiveconditions
     negativeconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("negativeconditions").strip().split(",")]))
-   # session["negativeconditions"] = negativeconditions
+    session["negativeconditions"] = negativeconditions
     upperagefilter = request.form.get("upperage").strip()
-    #session["upperage"] = upperagefilter
+    session["upperagefilter"] = upperagefilter
     loweragefilter = request.form.get("lowerage").strip()
-    #session["lowerage"] = loweragefilter
+    session["loweragefilter"] = loweragefilter
     practicesfilter = list(filter(lambda x : x, [x.strip() for x in request.form.get("practices").strip().split(",")]))
+    session["practicesfilter"] = practicesfilter
     
     client = BigQueryClient()
-    session["activeprofile"] = [row.Id for row in client.query(construct_filter_query(genderfilter, 
+    temp = [row.Id for row in client.query(construct_filter_query(genderfilter, 
                                                                   positiveconditions,
                                                                   negativeconditions,
                                                                   upperagefilter,
                                                                   loweragefilter,
                                                                   practicesfilter))]
     
-    if len(session["activeprofile"]) == 0:
+    if len(temp) == 0:
         return make_response("Sorry no patients found meeting that criteria", 200)
     else:
         return redirect("/population_summary")
@@ -107,7 +107,7 @@ def construct_filter_query(genderfilter=[],positiveconditions=[],negativeconditi
         upperagequery = "DATE_DIFF(CURRENT_DATE,{}.{},YEAR) <= {}".format(PATIENT,PATIENT_BIRTHDATE,upperagefilter)
     else:
         upperagequery = ""
-    loweragefilter = request.form.get("lowerage").strip()
+        
     if loweragefilter != "":
         loweragequery = "DATE_DIFF(CURRENT_DATE,{}.{},YEAR) >= {}".format(PATIENT,PATIENT_BIRTHDATE,loweragefilter)
     else:
@@ -144,7 +144,12 @@ def construct_filter_query(genderfilter=[],positiveconditions=[],negativeconditi
 @app.route("/population_summary")
 def population_summary():
     client = BigQueryClient()
-    data = session["activeprofile"] #[row.Id for row in client.query(construct_filter_query())]
+    data = [row.Id for row in client.query(construct_filter_query(session["genderfilter"], 
+                                                                  session["positiveconditions"],
+                                                                  session["negativeconditions"],
+                                                                  session["upperagefilter"],
+                                                                  session["loweragefilter"],
+                                                                  session["practicesfilter"]))]
     
     conditions = get_conditions(data);
     condition_counts = conditions["DESCRIPTION"].value_counts().values
