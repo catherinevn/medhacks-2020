@@ -69,18 +69,20 @@
 <body>
 <div class="container-fluid">
 <div class="row">
+<center>
   <div class="col-12">
   <h1>
     <img src="{{ url_for('static', filename='Logo_no_icon.png') }}"/>
 
   </h1>
-  There are currently {{patientno}} patients in the electronic health records
   </div>
 </div>
+</center>
 <form id="filterform" method="POST" action="/filter_patients">
 <div class="row">
 <div class="col-4"></div>
 <div class="col-4">
+    <br /> 
     <center>
     <br /> 
     <div class="container">
@@ -203,7 +205,7 @@
   <br /> 
   <div class="container">
     <div class="col-12">
-    <input type="submit" id="filter_population" value="Filter">
+    <input type="submit" id="filter_population" value="Filter" class="btn btn-primary">
     </center>
     </div>
   </div>

@@ -51,39 +51,68 @@ def root():
     race = [row[PATIENT_RACE] for row in client.query("SELECT DISTINCT {} FROM {}.{}".format(PATIENT_RACE, DATABASE, PATIENT))]
     conditions = [(row[CONDITION_CODE],row[CONDITION_DESCRIPTION]) for row in client.query("SELECT DISTINCT {},{} from {}.{}".format(CONDITION_CODE, CONDITION_DESCRIPTION, DATABASE, CONDITIONS))]
     practices = [(row[ORGANIZATION_ID],row[ORGANIZATION_NAME]) for row in client.query("SELECT DISTINCT {},{} from {}.{}".format(ORGANIZATION_ID, ORGANIZATION_NAME, DATABASE, ORGANIZATIONS))]
-    patientno = [row.count for row in client.query("SELECT COUNT(DISTINCT {}) as count FROM {}.{}".format(PATIENT_ID, DATABASE, PATIENT))][0]
 
-    return render_template('index.html', gender=gender, race=race, conditions=conditions, practices=practices, patientno=patientno)
+    return render_template('index.html', gender=gender, race=race, conditions=conditions, practices=practices)
 
 @app.route("/filter_patients", methods=["GET", "POST"])
 def filter_patients():
-    genderfilter = list(filter(lambda x : x, [x.strip for x in request.form.get("genderfilter").strip().split(",")]))
+    genderfilter = list(filter(lambda x : x, [x.strip() for x in request.form.get("genderfilter").strip().split(",")]))
+    session["genderfilter"] = genderfilter
+    positiveconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("positiveconditions").strip().split(",")]))
+    session["positiveconditions"] = positiveconditions
+    negativeconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("negativeconditions").strip().split(",")]))
+    session["negativeconditions"] = negativeconditions
+    upperagefilter = request.form.get("upperage").strip()
+    session["upperagefilter"] = upperagefilter
+    loweragefilter = request.form.get("lowerage").strip()
+    session["loweragefilter"] = loweragefilter
+    practicesfilter = list(filter(lambda x : x, [x.strip() for x in request.form.get("practices").strip().split(",")]))
+    session["practicesfilter"] = practicesfilter
+    
+    client = BigQueryClient()
+    temp = [row.Id for row in client.query(construct_filter_query(genderfilter, 
+                                                                  positiveconditions,
+                                                                  negativeconditions,
+                                                                  upperagefilter,
+                                                                  loweragefilter,
+                                                                  practicesfilter))]
+    
+    if len(temp) == 0:
+        return make_response("Sorry no patients found meeting that criteria", 200)
+    else:
+        return redirect("/population_summary")
+
+def construct_filter_query(genderfilter=[],positiveconditions=[],negativeconditions=[],upperagefilter="",loweragefilter="", practicesfilter=[]):
     if len(genderfilter) == 1:
         genderquery = "{}.{} = '{}'".format(PATIENT,PATIENT_GENDER, genderfilter[0])
     else:
         genderquery = ""
-    positiveconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("positiveconditions").strip().split(",")]))
+    
     if len(positiveconditions) > 0:
         positiveconditionsquery = "{}.{} IN (SELECT {} FROM {}.{} WHERE {} IN ({}))".format(PATIENT,PATIENT_ID, CONDITION_PATIENT,DATABASE,CONDITIONS,CONDITIONS_DESCRIPTION, ",".join(["'{}'".format(x) for x in positiveconditions]))
     else:
         positiveconditionsquery = ""
-    negativeconditions = list(filter(lambda x : x, [x.strip() for x in request.form.get("negativeconditions").strip().split(",")]))
+    
     if len(negativeconditions) > 0:
         negativeconditionsquery = "{}.{} NOT IN (SELECT {} FROM {}.{} WHERE {} IN ({}))".format(PATIENT,PATIENT_ID, CONDITION_PATIENT,DATABASE,CONDITIONS,CONDITIONS_DESCRIPTION, ",".join(["'{}'".format(x) for x in positiveconditions]))
     else:
         negativeconditionsquery = ""
-    upperagefilter = request.form.get("upperage").strip()
+    
+    if len(practicesfilter) > 0:
+        practicesquery = "Patients.Id IN (SELECT PATIENT FROM Synthea2.Encounters WHERE ORGANIZATION IN (SELECT Organizations.Id FROM Synthea2.Organizations WHERE NAME IN ({})))".format(",".join(["'{}'".format(x) for x in practicesfilter]))
+    else:
+        practicesquery = ""
+    
     if upperagefilter != "":
         upperagequery = "DATE_DIFF(CURRENT_DATE,{}.{},YEAR) <= {}".format(PATIENT,PATIENT_BIRTHDATE,upperagefilter)
     else:
         upperagequery = ""
-    loweragefilter = request.form.get("lowerage").strip()
+        
     if loweragefilter != "":
         loweragequery = "DATE_DIFF(CURRENT_DATE,{}.{},YEAR) >= {}".format(PATIENT,PATIENT_BIRTHDATE,loweragefilter)
     else:
         loweragequery = ""
     
-    client = BigQueryClient()
     overallquery = "SELECT {}.{} FROM {}.{} WHERE {} IS NULL".format(PATIENT,PATIENT_ID,DATABASE,PATIENT,PATIENT_DEATHDATE)
     if genderquery != "" and overallquery.find("WHERE") > -1:
         overallquery += " AND " + genderquery
@@ -97,6 +126,10 @@ def filter_patients():
         overallquery += " AND " + negativeconditionsquery
     elif negativeconditionsquery != "" and overallquery.find("WHERE") == -1:
         overallquery += " WHERE " + negativeconditionsquery
+    if practicesquery != "" and overallquery.find("WHERE") > -1:
+        overallquery += " AND " + practicesquery
+    elif practicesquery != "" and overallquery.find("WHERE") == -1:
+        overallquery += " WHERE " + practicesquery
     if loweragequery != "" and overallquery.find("WHERE") > -1:
         overallquery += " AND " + loweragequery
     elif loweragequery != "" and overallquery.find("WHERE") == -1:
@@ -105,17 +138,19 @@ def filter_patients():
         overallquery += " AND " + upperagequery
     elif upperagequery != "" and overallquery.find("WHERE") == -1:
         overallquery += " WHERE " + upperagequery
-    print(request.form)
-    print(overallquery)
-    session["activeprofile"] = [row.Id for row in client.query(overallquery)]
-    if len(session["activeprofile"]) == 0:
-        return make_response("Sorry no patients found meeting that criteria", 200)
-    else:
-        return redirect("/population_summary")
+    return overallquery
 
 @app.route("/population_summary")
 def population_summary():
-    conditions = get_conditions();
+    client = BigQueryClient()
+    data = [row.Id for row in client.query(construct_filter_query(session["genderfilter"], 
+                                                                  session["positiveconditions"],
+                                                                  session["negativeconditions"],
+                                                                  session["upperagefilter"],
+                                                                  session["loweragefilter"],
+                                                                  session["practicesfilter"]))]
+    
+    conditions = get_conditions(data);
     condition_counts = conditions["DESCRIPTION"].value_counts().values
     condition_count_labels = conditions["DESCRIPTION"].value_counts().index
     condition_counts = list(condition_counts[condition_count_labels != ""])
@@ -173,17 +208,10 @@ def population_summary():
                            encounters_per_patient=encounters_per_patient,
                            encounters_per_patient_label=encounters_per_patient_label)
 
-@app.route("/get_current_profiles", methods=["GET"])
-def get_profiles():
-    return make_response(jsonify(list(session.keys())), 200)
-
-def get_conditions(no_profile=False):
-    if no_profile == True:
-        return
-    else:
-        client = BigQueryClient()
-        result = client.query("SELECT {}, {}, {}, {} FROM {}.{} WHERE {} IN ({})".format(CONDITION_PATIENT,CONDITION_DESCRIPTION, CONDITION_START, CONDITION_STOP,DATABASE,CONDITIONS,CONDITION_PATIENT,",".join(["'{}'".format(x) for x in session["activeprofile"]])))
-        return pd.DataFrame([dict(zip(x.keys(),x.values())) for x in result])
+def get_conditions(profile):
+    client = BigQueryClient()
+    result = client.query("SELECT {}, {}, {}, {} FROM {}.{} WHERE {} IN ({})".format(CONDITION_PATIENT,CONDITION_DESCRIPTION, CONDITION_START, CONDITION_STOP,DATABASE,CONDITIONS,CONDITION_PATIENT,",".join(["'{}'".format(x) for x in profile])))
+    return pd.DataFrame([dict(zip(x.keys(),x.values())) for x in result])
 
 def get_demographics(no_profile=False):
     client = BigQueryClient()
